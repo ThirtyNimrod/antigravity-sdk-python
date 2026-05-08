@@ -114,9 +114,10 @@ class Agent:
           and not has_tool_decide_hook
       ):
         raise ValueError(
-            "Policies or a PreToolCallDecideHook must be provided when "
-            "non-read-only tools or MCP servers are enabled to prevent "
-            "interactive handlers from hanging in non-interactive contexts."
+            "Write tools or MCP servers are enabled without a safety policy. "
+            "Add policies=[policy.allow_all()] to approve all tool calls, "
+            "or policies=[policy.deny_all(), policy.allow('tool_name')] "
+            "to selectively allow specific tools."
         )
 
       if active_policies:

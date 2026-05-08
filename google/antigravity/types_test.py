@@ -649,6 +649,15 @@ class BuiltinToolsTest(unittest.TestCase):
         "nondestructive and destructive_tools must not overlap.",
     )
 
+  def test_all_returns_every_member(self):
+    """Verifies that all() returns every enum member."""
+    self.assertEqual(set(types.BuiltinTools.all()), set(types.BuiltinTools))
+    self.assertEqual(len(types.BuiltinTools.all()), len(types.BuiltinTools))
+
+  def test_none_returns_empty_list(self):
+    """Verifies that none() returns an empty list."""
+    self.assertEqual(types.BuiltinTools.none(), [])
+
 
 class CapabilitiesConfigTest(unittest.TestCase):
   """Tests for the CapabilitiesConfig Pydantic model."""

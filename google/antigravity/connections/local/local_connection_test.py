@@ -22,7 +22,6 @@ import unittest
 from unittest import mock
 
 from absl.testing import absltest
-
 import websockets
 
 from google.antigravity import types
@@ -30,9 +29,9 @@ from google.antigravity.connections.local import local_connection
 from google.antigravity.connections.local import local_connection_config
 from google.antigravity.connections.local import localharness_pb2
 from google.antigravity.connections.local import test_utils
-
 from google.antigravity.hooks import hook_runner
 from google.antigravity.hooks import hooks as hooks_base
+from google.antigravity.hooks import policy
 from google.antigravity.tools import tool_runner
 from google.antigravity.types import QuestionResponse
 
@@ -2809,6 +2808,18 @@ class LocalAgentConfigTest(unittest.TestCase):
     self.assertEqual(
         strategy._gemini_config.models.default.name, "gemini-2.5-pro"
     )
+
+  def test_permissive_defaults(self):
+    """LocalAgentConfig defaults to all tools and allow_all() policy."""
+    config = local_connection_config.LocalAgentConfig(
+        system_instructions="test",
+    )
+    self.assertIsNone(config.capabilities.enabled_tools)
+    self.assertIsNone(config.capabilities.disabled_tools)
+    self.assertEqual(len(config.policies), 1)
+    p = config.policies[0]
+    self.assertEqual(p.tool, "*")
+    self.assertEqual(p.decision, policy.Decision.APPROVE)
 
 
 if __name__ == "__main__":

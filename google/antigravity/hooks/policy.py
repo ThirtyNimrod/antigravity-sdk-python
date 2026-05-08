@@ -148,6 +148,32 @@ def ask_user(
   )
 
 
+def allow_all() -> Policy:
+  """Creates a policy that approves all tool calls without confirmation.
+
+  Intended for autonomous agents and local development where interactive
+  confirmation is not needed. Equivalent to ``allow("*")``.
+
+  Returns:
+    A Policy that approves every tool call.
+  """
+  return allow(_WILDCARD, name="allow_all")
+
+
+def deny_all() -> Policy:
+  """Creates a policy that denies all tool calls.
+
+  Use as a base rule with specific ``allow()`` overrides for a
+  deny-by-default posture. Specific policies always take priority over
+  wildcard policies, so ``[deny_all(), allow("view_file")]`` will allow
+  only ``view_file`` and deny everything else.
+
+  Returns:
+    A Policy that denies every tool call.
+  """
+  return deny(_WILDCARD, name="deny_all")
+
+
 # ---------------------------------------------------------------------------
 # Priority bucket indices (lower = higher priority)
 # ---------------------------------------------------------------------------

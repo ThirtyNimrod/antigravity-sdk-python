@@ -22,6 +22,7 @@ import pydantic
 
 from google.antigravity import types
 from google.antigravity.connections import connection
+from google.antigravity.hooks import policy
 
 
 class LocalAgentConfig(connection.AgentConfig):
@@ -29,7 +30,17 @@ class LocalAgentConfig(connection.AgentConfig):
 
   This is the default config for the Agent class. It uses the
   Go-based localharness binary.
+
+  Unlike the base AgentConfig, LocalAgentConfig defaults to all tools enabled
+  with a permissive policy, since it runs on the developer's own machine.
   """
+
+  capabilities: types.CapabilitiesConfig = pydantic.Field(
+      default_factory=types.CapabilitiesConfig
+  )
+  policies: list[Any] = pydantic.Field(
+      default_factory=lambda: [policy.allow_all()]
+  )
 
   gemini_config: types.GeminiConfig = pydantic.Field(
       default_factory=types.GeminiConfig

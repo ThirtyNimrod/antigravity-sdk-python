@@ -15,7 +15,7 @@
 """Tests for the tool call policy system.
 
 Covers:
-- Builder functions (allow, deny, ask_user)
+- Builder functions (allow, deny, ask_user, allow_all, deny_all)
 - Startup validation (missing ASK_USER handler)
 - Priority-based evaluation order across all 6 levels
 - Short-circuit behavior (first match wins within a group)
@@ -73,6 +73,20 @@ class BuilderTest(unittest.TestCase):
 
     p = policy.deny("run_command", when=pred)
     self.assertIs(p.when, pred)
+
+  def test_allow_all_creates_wildcard_approve(self):
+    """allow_all() must produce a wildcard APPROVE policy."""
+    p = policy.allow_all()
+    self.assertEqual(p.tool, "*")
+    self.assertEqual(p.decision, policy.Decision.APPROVE)
+    self.assertEqual(p.name, "allow_all")
+
+  def test_deny_all_creates_wildcard_deny(self):
+    """deny_all() must produce a wildcard DENY policy."""
+    p = policy.deny_all()
+    self.assertEqual(p.tool, "*")
+    self.assertEqual(p.decision, policy.Decision.DENY)
+    self.assertEqual(p.name, "deny_all")
 
 
 class ValidationTest(unittest.TestCase):
@@ -440,6 +454,38 @@ class DefaultBehaviorTest(unittest.IsolatedAsyncioTestCase):
     ctx = hooks.HookContext()
     result = await hook.run(ctx, _make_tool_call("any_tool"))
     self.assertTrue(result.allow)
+
+
+class ConvenienceBuilderTest(unittest.IsolatedAsyncioTestCase):
+  """Verifies allow_all() and deny_all() evaluate correctly through enforce."""
+
+  async def test_allow_all_approves_any_tool(self):
+    """allow_all() approves arbitrary tool calls."""
+    hook = policy.enforce([policy.allow_all()])
+    ctx = hooks.HookContext()
+    for tool in ("run_command", "view_file", "create_file", "unknown_tool"):
+      result = await hook.run(ctx, _make_tool_call(tool))
+      self.assertTrue(result.allow, f"{tool} should be allowed")
+
+  async def test_deny_all_denies_any_tool(self):
+    """deny_all() denies arbitrary tool calls."""
+    hook = policy.enforce([policy.deny_all()])
+    ctx = hooks.HookContext()
+    for tool in ("run_command", "view_file", "create_file"):
+      result = await hook.run(ctx, _make_tool_call(tool))
+      self.assertFalse(result.allow, f"{tool} should be denied")
+
+  async def test_deny_all_with_specific_allow_override(self):
+    """deny_all() + allow(tool) creates deny-by-default with exceptions."""
+    hook = policy.enforce([
+        policy.deny_all(),
+        policy.allow("view_file"),
+    ])
+    ctx = hooks.HookContext()
+    result = await hook.run(ctx, _make_tool_call("view_file"))
+    self.assertTrue(result.allow)
+    result = await hook.run(ctx, _make_tool_call("run_command"))
+    self.assertFalse(result.allow)
 
 
 class DenyReasonTest(unittest.IsolatedAsyncioTestCase):

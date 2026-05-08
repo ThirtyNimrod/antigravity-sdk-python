@@ -110,9 +110,10 @@ class AgentTest(unittest.IsolatedAsyncioTestCase):
       "local.local_connection.LocalConnectionStrategy"
   )
   @mock.patch.object(conversation.Conversation, "create")
-  async def test_agent_read_only_default(
+  async def test_agent_default_capabilities(
       self, mock_conv_create, mock_strategy_class
   ):
+    """Default LocalAgentConfig enables all tools (permissive)."""
     del mock_conv_create  # Unused.
 
     mock_strategy_instance = mock.MagicMock()
@@ -124,9 +125,7 @@ class AgentTest(unittest.IsolatedAsyncioTestCase):
       _, kwargs = mock_strategy_class.call_args
       capabilities_config = kwargs.get("capabilities_config")
       self.assertIsNotNone(capabilities_config)
-      self.assertEqual(
-          capabilities_config.enabled_tools, types.BuiltinTools.read_only()
-      )
+      self.assertIsNone(capabilities_config.enabled_tools)
 
   @mock.patch(
       "google.antigravity.connections."
@@ -145,6 +144,7 @@ class AgentTest(unittest.IsolatedAsyncioTestCase):
     config = local_connection.LocalAgentConfig(
         system_instructions="test",
         capabilities=types.CapabilitiesConfig(),
+        policies=[],
     )
     with self.assertRaises(ValueError):
       async with agent.Agent(config):
@@ -166,6 +166,7 @@ class AgentTest(unittest.IsolatedAsyncioTestCase):
         capabilities=types.CapabilitiesConfig(
             enabled_tools=[types.BuiltinTools.RUN_COMMAND],
         ),
+        policies=[],
     )
     with self.assertRaises(ValueError):
       async with agent.Agent(config):
@@ -187,6 +188,7 @@ class AgentTest(unittest.IsolatedAsyncioTestCase):
         capabilities=types.CapabilitiesConfig(
             enabled_tools=list(types.BuiltinTools),
         ),
+        policies=[],
     )
     with self.assertRaises(ValueError):
       async with agent.Agent(config):
@@ -206,6 +208,7 @@ class AgentTest(unittest.IsolatedAsyncioTestCase):
     config = local_connection.LocalAgentConfig(
         system_instructions="test",
         capabilities=types.CapabilitiesConfig(disabled_tools=[]),
+        policies=[],
     )
     with self.assertRaises(ValueError):
       async with agent.Agent(config):
@@ -266,6 +269,7 @@ class AgentTest(unittest.IsolatedAsyncioTestCase):
         mcp_servers=[
             {"type": "stdio", "command": "node", "args": ["index.js"]}
         ],
+        policies=[],
     )
     with self.assertRaises(ValueError):
       async with agent.Agent(config):
@@ -894,12 +898,12 @@ class AgentConfigTest(unittest.TestCase):
     self.assertEqual(shared.models.default.name, types.DEFAULT_MODEL)
 
   def test_defaults(self):
-    """Verifies AgentConfig defaults: read-only capabilities, default model."""
+    """Verifies AgentConfig defaults: permissive capabilities, default model."""
     config = local_connection.LocalAgentConfig(system_instructions="test")
-    self.assertEqual(
-        config.capabilities.enabled_tools,
-        types.BuiltinTools.read_only(),
-    )
+    self.assertIsNone(config.capabilities.enabled_tools)
+    self.assertEqual(len(config.policies), 1)
+    self.assertEqual(config.policies[0].tool, "*")
+    self.assertEqual(config.policies[0].decision, policy.Decision.APPROVE)
     self.assertEqual(
         config.gemini_config.models.default.name, types.DEFAULT_MODEL
     )

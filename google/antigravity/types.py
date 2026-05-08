@@ -225,6 +225,16 @@ class BuiltinTools(str, enum.Enum):
         cls.FINISH,
     ]
 
+  @classmethod
+  def all(cls) -> list["BuiltinTools"]:
+    """Returns all builtin tools."""
+    return list(cls)
+
+  @classmethod
+  def none(cls) -> list["BuiltinTools"]:
+    """Returns an empty tool list (no builtin tools)."""
+    return []
+
 
 class CapabilitiesConfig(pydantic.BaseModel):
   """General agent capability configuration.
