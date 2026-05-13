@@ -35,22 +35,33 @@ import sys
 from absl import app
 from absl import logging
 
+from google.antigravity import types
 from google.antigravity.agent import Agent
 from google.antigravity.connections.local.local_connection_config import LocalAgentConfig
 
 
 async def run_prompt(agent: Agent, prompt: str) -> None:
-  """Sends a prompt and streams the response using the interleaved chunk stream."""
+  """Sends a prompt and streams the response, dispatching by chunk type."""
   print(f"\n{'='*60}")
   print(f"--- Sending: {prompt!r} ---")
   print(f"{'='*60}")
 
   response = await agent.chat(prompt)
 
-  # Stream text deltas to stdout as they arrive.
-  async for delta in response:
-    sys.stdout.write(delta)
-    sys.stdout.flush()
+  in_thought = False
+  async for chunk in response.chunks:
+    if isinstance(chunk, types.Thought):
+      if not in_thought:
+        sys.stdout.write("[thinking] ")
+        in_thought = True
+      sys.stdout.write(chunk.text)
+      sys.stdout.flush()
+    elif isinstance(chunk, types.Text):
+      if in_thought:
+        print()
+        in_thought = False
+      sys.stdout.write(chunk.text)
+      sys.stdout.flush()
   print()
 
 

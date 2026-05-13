@@ -20,6 +20,7 @@ types. They are pure Python Pydantic V2 models with no proto dependencies.
 
 from __future__ import annotations
 
+import asyncio
 import enum
 import itertools
 import mimetypes
@@ -746,8 +747,14 @@ class Text(StreamChunk):
 class ChatResponse:
   """The turn response from Agent.chat().
 
-  An async stream of semantic chunks with lazy buffering. This class provides
-  both zero-boilerplate text token streaming and advanced sugared event streams.
+  An async stream of semantic chunks with lazy buffering.  Provides both
+  zero-boilerplate text token streaming and advanced sugared event streams.
+
+  Every iterator (``.chunks``, ``.thoughts``, ``.tool_calls``,
+  ``async for delta in response``) returns an **independent cursor** over a
+  shared buffer.  Cursors are safe to consume sequentially, or concurrently
+  via ``asyncio.gather``.  If the upstream stream raises, the error is
+  stored and re-raised to every cursor that reaches the end of the buffer.
   """
 
   def __init__(
@@ -759,26 +766,52 @@ class ChatResponse:
     self._conversation = conversation
     self._buffered_chunks: list[StreamChunk | ToolCall | ToolResult] = []
     self._is_done = False
+    self._stream_error: BaseException | None = None
+    self._pull_lock = asyncio.Lock()
 
   @property
   def chunks(self) -> AsyncIterator[StreamChunk | ToolCall | ToolResult]:
-    """The rich, unfiltered semantic chunk stream for more advanced use cases."""
+    """The rich, unfiltered semantic chunk stream for more advanced use cases.
 
-    async def _chunks_gen():
-      # Cache Walk (yields already cached chunks for re-iteration)
-      for chunk in self._buffered_chunks:
-        yield chunk
+    Each call returns an **independent cursor** over the shared chunk buffer.
+    Multiple cursors can be consumed sequentially or concurrently — each
+    advances at its own pace.  When a cursor reaches the live edge of the
+    buffer it pulls from the underlying network stream, appending chunks
+    that all other cursors will also see.
 
-      # Network Walk (pulls from the live stream and caches them)
-      if not self._is_done:
-        try:
-          async for chunk in self._chunk_stream:
-            self._buffered_chunks.append(chunk)
-            yield chunk
-          self._is_done = True
-        except Exception:
-          self._is_done = True
-          raise
+    Concurrent safety is guaranteed by an internal lock that serializes
+    network pulls — only one cursor awaits the upstream ``__anext__`` at a
+    time.  If the upstream raises, the error is stored and re-raised to
+    every cursor that reaches the end of the buffer.
+    """
+
+    async def _chunks_gen() -> (
+        AsyncIterator[StreamChunk | ToolCall | ToolResult]
+    ):
+      pos = 0
+      while True:
+        if pos < len(self._buffered_chunks):
+          yield self._buffered_chunks[pos]
+          pos += 1
+        elif self._is_done:
+          if self._stream_error is not None:
+            raise self._stream_error
+          return
+        else:
+          async with self._pull_lock:
+            # Re-check after acquiring — another cursor may have pulled
+            # while we waited for the lock.
+            if pos < len(self._buffered_chunks) or self._is_done:
+              continue
+            try:
+              chunk = await self._chunk_stream.__anext__()
+              self._buffered_chunks.append(chunk)
+            except StopAsyncIteration:
+              self._is_done = True
+            except Exception as e:
+              self._is_done = True
+              self._stream_error = e
+              raise
 
     return _chunks_gen()
 

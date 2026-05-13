@@ -18,6 +18,7 @@ Validates model construction, validation, immutability, forward compatibility,
 and the AntigravityValidationError wrapper.
 """
 
+import asyncio
 import pathlib
 import tempfile
 import unittest
@@ -934,6 +935,281 @@ class ChatResponseStreamTest(unittest.IsolatedAsyncioTestCase):
       round_2 = [token async for token in response]
       self.assertEqual(round_2, ["A", "B"])
       self.assertEqual(pull_count, 1)
+
+  async def test_sequential_thoughts_then_text(self):
+    """Cache replay: thoughts first, then text sees all Text chunks."""
+    chunks = [
+        types.Thought(step_index=1, text="hmm..."),
+        types.Text(step_index=2, text="Hello "),
+        types.Text(step_index=3, text="world!"),
+    ]
+
+    async def mock_stream():
+      for c in chunks:
+        yield c
+
+    response = types.ChatResponse(
+        mock_stream(),
+        conversation=mock.MagicMock(spec=conversation.Conversation),
+    )
+    thoughts = [t async for t in response.thoughts]
+    self.assertEqual(thoughts, ["hmm..."])
+    text_deltas = [t async for t in response]
+    self.assertEqual(text_deltas, ["Hello ", "world!"])
+
+  async def test_sequential_text_then_thoughts(self):
+    """Cache replay: text first, then thoughts sees all Thought chunks."""
+    chunks = [
+        types.Thought(step_index=1, text="thinking"),
+        types.Text(step_index=2, text="answer"),
+    ]
+
+    async def mock_stream():
+      for c in chunks:
+        yield c
+
+    response = types.ChatResponse(
+        mock_stream(),
+        conversation=mock.MagicMock(spec=conversation.Conversation),
+    )
+    text_deltas = [t async for t in response]
+    self.assertEqual(text_deltas, ["answer"])
+    thoughts = [t async for t in response.thoughts]
+    self.assertEqual(thoughts, ["thinking"])
+
+  async def test_sequential_tool_calls_then_text(self):
+    """Cache replay: tool_calls first, then text."""
+    tc = types.ToolCall(id="c1", name="search", args={"q": "x"})
+    chunks = [
+        types.Text(step_index=1, text="Let me search."),
+        tc,
+        types.Text(step_index=3, text="Done."),
+    ]
+
+    async def mock_stream():
+      for c in chunks:
+        yield c
+
+    response = types.ChatResponse(
+        mock_stream(),
+        conversation=mock.MagicMock(spec=conversation.Conversation),
+    )
+    calls = [c async for c in response.tool_calls]
+    self.assertEqual(len(calls), 1)
+    self.assertEqual(calls[0].name, "search")
+    text_deltas = [t async for t in response]
+    self.assertEqual(text_deltas, ["Let me search.", "Done."])
+
+  async def test_all_three_sequential(self):
+    """Cache replay: thoughts → tool_calls → text from one response."""
+    chunks = [
+        types.Thought(step_index=1, text="plan"),
+        types.Text(step_index=2, text="I'll search."),
+        types.ToolCall(id="c1", name="search", args={}),
+        types.Text(step_index=4, text="Found it."),
+    ]
+
+    async def mock_stream():
+      for c in chunks:
+        yield c
+
+    response = types.ChatResponse(
+        mock_stream(),
+        conversation=mock.MagicMock(spec=conversation.Conversation),
+    )
+    thoughts = [t async for t in response.thoughts]
+    calls = [c async for c in response.tool_calls]
+    text_deltas = [t async for t in response]
+    self.assertEqual(thoughts, ["plan"])
+    self.assertEqual(len(calls), 1)
+    self.assertEqual(text_deltas, ["I'll search.", "Found it."])
+
+  async def test_two_chunks_cursors_independent(self):
+    """Two raw .chunks cursors both see identical output."""
+    chunks = [
+        types.Thought(step_index=1, text="a"),
+        types.Text(step_index=2, text="b"),
+    ]
+
+    async def mock_stream():
+      for c in chunks:
+        yield c
+
+    response = types.ChatResponse(
+        mock_stream(),
+        conversation=mock.MagicMock(spec=conversation.Conversation),
+    )
+    cursor1 = [c async for c in response.chunks]
+    cursor2 = [c async for c in response.chunks]
+    self.assertEqual(cursor1, cursor2)
+    self.assertEqual(len(cursor1), 2)
+
+  async def test_resolve_then_text_then_aiter(self):
+    """resolve(), text(), and __aiter__ all work on the same response."""
+    chunks = [
+        types.Thought(step_index=1, text="think"),
+        types.Text(step_index=2, text="hello "),
+        types.Text(step_index=3, text="world"),
+    ]
+
+    async def mock_stream():
+      for c in chunks:
+        yield c
+
+    response = types.ChatResponse(
+        mock_stream(),
+        conversation=mock.MagicMock(spec=conversation.Conversation),
+    )
+    resolved = await response.resolve()
+    self.assertEqual(len(resolved), 3)
+    full_text = await response.text()
+    self.assertEqual(full_text, "hello world")
+    text_deltas = [t async for t in response]
+    self.assertEqual(text_deltas, ["hello ", "world"])
+
+  async def test_interleaved_chunk_types(self):
+    """Thought-Text-Thought-Text-ToolCall pattern streams correctly."""
+    chunks = [
+        types.Thought(step_index=1, text="A"),
+        types.Text(step_index=2, text="B"),
+        types.Thought(step_index=3, text="C"),
+        types.Text(step_index=4, text="D"),
+        types.ToolCall(id="c1", name="fn", args={}),
+    ]
+
+    async def mock_stream():
+      for c in chunks:
+        yield c
+
+    response = types.ChatResponse(
+        mock_stream(),
+        conversation=mock.MagicMock(spec=conversation.Conversation),
+    )
+    all_chunks = [c async for c in response.chunks]
+    self.assertEqual(len(all_chunks), 5)
+    thoughts = [t async for t in response.thoughts]
+    self.assertEqual(thoughts, ["A", "C"])
+    text_deltas = [t async for t in response]
+    self.assertEqual(text_deltas, ["B", "D"])
+    calls = [c async for c in response.tool_calls]
+    self.assertEqual(len(calls), 1)
+
+  async def test_error_propagation_to_all_cursors(self):
+    """Error storage: stream error re-raised to every cursor."""
+
+    async def mock_stream():
+      yield types.Text(step_index=1, text="ok")
+      raise RuntimeError("network failure")
+
+    response = types.ChatResponse(
+        mock_stream(),
+        conversation=mock.MagicMock(spec=conversation.Conversation),
+    )
+
+    # First cursor: sees one chunk then the error.
+    with self.assertRaises(RuntimeError):
+      _ = [c async for c in response.chunks]
+
+    # Second cursor: replays cached chunk, then re-raises stored error.
+    with self.assertRaises(RuntimeError):
+      _ = [c async for c in response.chunks]
+
+    # Sugared iterator: same behavior.
+    with self.assertRaises(RuntimeError):
+      _ = [t async for t in response]
+
+  async def test_concurrent_cursors_via_gather(self):
+    """Lock safety: two cursors via asyncio.gather don't crash."""
+    chunks = [
+        types.Thought(step_index=1, text="t"),
+        types.Text(step_index=2, text="a"),
+        types.Text(step_index=3, text="b"),
+    ]
+
+    async def mock_stream():
+      for c in chunks:
+        yield c
+
+    response = types.ChatResponse(
+        mock_stream(),
+        conversation=mock.MagicMock(spec=conversation.Conversation),
+    )
+
+    async def drain_thoughts():
+      return [t async for t in response.thoughts]
+
+    async def drain_text():
+      return [t async for t in response]
+
+    thoughts, text_deltas = await asyncio.gather(drain_thoughts(), drain_text())
+    self.assertEqual(thoughts, ["t"])
+    self.assertEqual(text_deltas, ["a", "b"])
+
+  async def test_explicit_lock_contention_double_check(self):
+    """Explicitly tests the double-check condition under lock contention."""
+
+    class InstrumentedLock(asyncio.Lock):
+
+      def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.calls = 0
+        self.second_call = asyncio.Event()
+
+      async def acquire(self) -> bool:
+        self.calls += 1
+        if self.calls == 2:
+          self.second_call.set()
+        return await super().acquire()
+
+    event_a_pulling = asyncio.Event()
+    event_b_waiting = asyncio.Event()
+
+    async def slow_stream():
+      event_a_pulling.set()
+      await event_b_waiting.wait()
+      yield types.Text(step_index=1, text="chunk1")
+
+    response = types.ChatResponse(
+        slow_stream(),
+        conversation=mock.MagicMock(spec=conversation.Conversation),
+    )
+
+    instrumented_lock = InstrumentedLock()
+    response._pull_lock = instrumented_lock
+
+    cursor_a = response.chunks
+    cursor_b = response.chunks
+
+    task_a = asyncio.create_task(cursor_a.__anext__())
+    await event_a_pulling.wait()
+
+    task_b = asyncio.create_task(cursor_b.__anext__())
+    await instrumented_lock.second_call.wait()
+
+    event_b_waiting.set()
+
+    chunk_a = await task_a
+    chunk_b = await task_b
+
+    self.assertEqual(chunk_a, chunk_b)
+    self.assertEqual(chunk_a.text, "chunk1")
+
+  async def test_empty_stream_all_iterators(self):
+    """All iterators return empty on an empty stream."""
+
+    async def mock_empty_stream():
+      return
+      yield  # Makes this an async generator.
+
+    response = types.ChatResponse(
+        mock_empty_stream(),
+        conversation=mock.MagicMock(spec=conversation.Conversation),
+    )
+    self.assertEqual([c async for c in response.chunks], [])
+    self.assertEqual([t async for t in response.thoughts], [])
+    self.assertEqual([t async for t in response], [])
+    self.assertEqual([c async for c in response.tool_calls], [])
+    self.assertEqual(await response.text(), "")
 
   async def test_structured_output_lazy_accessor(self):
     """Verifies structured_output resolves the stream and fetches parsed payload from conversation."""
