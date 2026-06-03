@@ -193,9 +193,10 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b' \x01(\x0b\x32\x30.antigravity.localharness.UserInput.SlashCommandH\x00\x42\x06\n\x04part"O\n\x10ToolConfirmation\x12\x15\n\rtrajectory_id\x18\x01'
     b' \x01(\t\x12\x12\n\nstep_index\x18\x02'
     b' \x01(\r\x12\x10\n\x08\x61\x63\x63\x65pted\x18\x03'
-    b' \x01(\x08"\xb7\x01\n\x15TrajectoryStateUpdate\x12\x15\n\rtrajectory_id\x18\x02'
+    b' \x01(\x08"\xc6\x01\n\x15TrajectoryStateUpdate\x12\x15\n\rtrajectory_id\x18\x02'
     b' \x01(\t\x12\x44\n\x05state\x18\x03'
-    b' \x01(\x0e\x32\x35.antigravity.localharness.TrajectoryStateUpdate.State"A\n\x05State\x12\x15\n\x11STATE_UNSPECIFIED\x10\x00\x12\x11\n\rSTATE_RUNNING\x10\x01\x12\x0e\n\nSTATE_IDLE\x10\x02"9\n\x06Struct\x12/\n\x06\x66ields\x18\x01'
+    b' \x01(\x0e\x32\x35.antigravity.localharness.TrajectoryStateUpdate.State\x12\r\n\x05\x65rror\x18\x04'
+    b' \x01(\t"A\n\x05State\x12\x15\n\x11STATE_UNSPECIFIED\x10\x00\x12\x11\n\rSTATE_RUNNING\x10\x01\x12\x0e\n\nSTATE_IDLE\x10\x02"9\n\x06Struct\x12/\n\x06\x66ields\x18\x01'
     b' \x03(\x0b\x32\x1f.antigravity.localharness.Field"E\n\x05\x46ield\x12\x0c\n\x04name\x18\x01'
     b' \x01(\t\x12.\n\x05value\x18\x02'
     b' \x01(\x0b\x32\x1f.antigravity.localharness.Value"\xb7\x02\n\x05Value\x12\x39\n\nnull_value\x18\x01'
@@ -263,8 +264,8 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_MCPSTDIOTRANSPORT_ENVENTRY']._serialized_options = b'8\001'
   _globals['_MCPHTTPTRANSPORT_HEADERSENTRY']._loaded_options = None
   _globals['_MCPHTTPTRANSPORT_HEADERSENTRY']._serialized_options = b'8\001'
-  _globals['_NULLVALUE']._serialized_start = 10385
-  _globals['_NULLVALUE']._serialized_end = 10412
+  _globals['_NULLVALUE']._serialized_start = 10400
+  _globals['_NULLVALUE']._serialized_end = 10427
   _globals['_INPUTCONFIG']._serialized_start = 49
   _globals['_INPUTCONFIG']._serialized_end = 195
   _globals['_INITIALIZECONVERSATIONEVENT']._serialized_start = 197
@@ -384,45 +385,45 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_TOOLCONFIRMATION']._serialized_start = 7802
   _globals['_TOOLCONFIRMATION']._serialized_end = 7881
   _globals['_TRAJECTORYSTATEUPDATE']._serialized_start = 7884
-  _globals['_TRAJECTORYSTATEUPDATE']._serialized_end = 8067
-  _globals['_TRAJECTORYSTATEUPDATE_STATE']._serialized_start = 8002
-  _globals['_TRAJECTORYSTATEUPDATE_STATE']._serialized_end = 8067
-  _globals['_STRUCT']._serialized_start = 8069
-  _globals['_STRUCT']._serialized_end = 8126
-  _globals['_FIELD']._serialized_start = 8128
-  _globals['_FIELD']._serialized_end = 8197
-  _globals['_VALUE']._serialized_start = 8200
-  _globals['_VALUE']._serialized_end = 8511
-  _globals['_LISTVALUE']._serialized_start = 8513
-  _globals['_LISTVALUE']._serialized_end = 8573
-  _globals['_TOOLCALL']._serialized_start = 8575
-  _globals['_TOOLCALL']._serialized_end = 8688
-  _globals['_TOOLRESPONSE']._serialized_start = 8691
-  _globals['_TOOLRESPONSE']._serialized_end = 8853
-  _globals['_USERQUESTIONSRESPONSE']._serialized_start = 8856
-  _globals['_USERQUESTIONSRESPONSE']._serialized_end = 9124
-  _globals['_USERQUESTIONSRESPONSE_QUESTIONSRESPONSE']._serialized_start = 9032
-  _globals['_USERQUESTIONSRESPONSE_QUESTIONSRESPONSE']._serialized_end = 9114
-  _globals['_USERQUESTIONANSWER']._serialized_start = 9127
-  _globals['_USERQUESTIONANSWER']._serialized_end = 9261
-  _globals['_MULTIPLECHOICEANSWER']._serialized_start = 9263
-  _globals['_MULTIPLECHOICEANSWER']._serialized_end = 9345
+  _globals['_TRAJECTORYSTATEUPDATE']._serialized_end = 8082
+  _globals['_TRAJECTORYSTATEUPDATE_STATE']._serialized_start = 8017
+  _globals['_TRAJECTORYSTATEUPDATE_STATE']._serialized_end = 8082
+  _globals['_STRUCT']._serialized_start = 8084
+  _globals['_STRUCT']._serialized_end = 8141
+  _globals['_FIELD']._serialized_start = 8143
+  _globals['_FIELD']._serialized_end = 8212
+  _globals['_VALUE']._serialized_start = 8215
+  _globals['_VALUE']._serialized_end = 8526
+  _globals['_LISTVALUE']._serialized_start = 8528
+  _globals['_LISTVALUE']._serialized_end = 8588
+  _globals['_TOOLCALL']._serialized_start = 8590
+  _globals['_TOOLCALL']._serialized_end = 8703
+  _globals['_TOOLRESPONSE']._serialized_start = 8706
+  _globals['_TOOLRESPONSE']._serialized_end = 8868
+  _globals['_USERQUESTIONSRESPONSE']._serialized_start = 8871
+  _globals['_USERQUESTIONSRESPONSE']._serialized_end = 9139
+  _globals['_USERQUESTIONSRESPONSE_QUESTIONSRESPONSE']._serialized_start = 9047
+  _globals['_USERQUESTIONSRESPONSE_QUESTIONSRESPONSE']._serialized_end = 9129
+  _globals['_USERQUESTIONANSWER']._serialized_start = 9142
+  _globals['_USERQUESTIONANSWER']._serialized_end = 9276
+  _globals['_MULTIPLECHOICEANSWER']._serialized_start = 9278
+  _globals['_MULTIPLECHOICEANSWER']._serialized_end = 9360
   _globals['_MEDIA']._serialized_start = 7541
   _globals['_MEDIA']._serialized_end = 7602
-  _globals['_USAGEMETADATA']._serialized_start = 9411
-  _globals['_USAGEMETADATA']._serialized_end = 9579
-  _globals['_MCPSERVERCONFIG']._serialized_start = 9582
-  _globals['_MCPSERVERCONFIG']._serialized_end = 9982
-  _globals['_MCPSERVERCONFIG_AUTHPROVIDERTYPE']._serialized_start = 9872
-  _globals['_MCPSERVERCONFIG_AUTHPROVIDERTYPE']._serialized_end = 9969
-  _globals['_MCPSTDIOTRANSPORT']._serialized_start = 9985
-  _globals['_MCPSTDIOTRANSPORT']._serialized_end = 10146
-  _globals['_MCPSTDIOTRANSPORT_ENVENTRY']._serialized_start = 10104
-  _globals['_MCPSTDIOTRANSPORT_ENVENTRY']._serialized_end = 10146
-  _globals['_MCPHTTPTRANSPORT']._serialized_start = 10149
-  _globals['_MCPHTTPTRANSPORT']._serialized_end = 10302
-  _globals['_MCPHTTPTRANSPORT_HEADERSENTRY']._serialized_start = 10256
-  _globals['_MCPHTTPTRANSPORT_HEADERSENTRY']._serialized_end = 10302
-  _globals['_ACTIONMCPTOOL']._serialized_start = 10304
-  _globals['_ACTIONMCPTOOL']._serialized_end = 10383
+  _globals['_USAGEMETADATA']._serialized_start = 9426
+  _globals['_USAGEMETADATA']._serialized_end = 9594
+  _globals['_MCPSERVERCONFIG']._serialized_start = 9597
+  _globals['_MCPSERVERCONFIG']._serialized_end = 9997
+  _globals['_MCPSERVERCONFIG_AUTHPROVIDERTYPE']._serialized_start = 9887
+  _globals['_MCPSERVERCONFIG_AUTHPROVIDERTYPE']._serialized_end = 9984
+  _globals['_MCPSTDIOTRANSPORT']._serialized_start = 10000
+  _globals['_MCPSTDIOTRANSPORT']._serialized_end = 10161
+  _globals['_MCPSTDIOTRANSPORT_ENVENTRY']._serialized_start = 10119
+  _globals['_MCPSTDIOTRANSPORT_ENVENTRY']._serialized_end = 10161
+  _globals['_MCPHTTPTRANSPORT']._serialized_start = 10164
+  _globals['_MCPHTTPTRANSPORT']._serialized_end = 10317
+  _globals['_MCPHTTPTRANSPORT_HEADERSENTRY']._serialized_start = 10271
+  _globals['_MCPHTTPTRANSPORT_HEADERSENTRY']._serialized_end = 10317
+  _globals['_ACTIONMCPTOOL']._serialized_start = 10319
+  _globals['_ACTIONMCPTOOL']._serialized_end = 10398
 # @@protoc_insertion_point(module_scope)

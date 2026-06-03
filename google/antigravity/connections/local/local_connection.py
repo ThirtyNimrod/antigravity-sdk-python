@@ -46,7 +46,6 @@ from google.antigravity.hooks import hook_runner as h_runner
 from google.antigravity.hooks import hooks
 from google.antigravity.tools import tool_runner as t_runner
 
-
 _ANY_ADAPTER = pydantic.TypeAdapter(Any)
 
 
@@ -131,6 +130,7 @@ _MCP_TOOL_PREFIX = "mcp_"
 
 def _get_mcp_tool_name(server_name: str, tool_name: str) -> str:
   return f"{_MCP_TOOL_PREFIX}{server_name}_{tool_name}"
+
 
 _IDLE_SENTINEL = object()
 _CLOSE_SENTINEL = None
@@ -601,6 +601,9 @@ class LocalConnection(connection.Connection):
 
         step_obj = await self._step_queue.get()
 
+        if isinstance(step_obj, Exception):
+          raise step_obj
+
         if step_obj is _IDLE_SENTINEL:
           continue
         if step_obj is None:
@@ -858,9 +861,7 @@ class LocalConnection(connection.Connection):
               and step_obj.source == types.StepSource.MODEL
               and step_obj.content
           ):
-            self._subagent_responses[step_obj.trajectory_id] = (
-                step_obj.content
-            )
+            self._subagent_responses[step_obj.trajectory_id] = step_obj.content
 
           # Dispatch post-tool-call or on-tool-error hooks for built-in tools
           # that were approved via ToolConfirmation. The harness executes them
@@ -945,16 +946,12 @@ class LocalConnection(connection.Connection):
               self._active_subagent_ids.discard(tsu.trajectory_id)
               if self._hook_runner:
                 op_ctx = hooks.OperationContext(self._get_turn_context())
-                response = self._subagent_responses.pop(
-                    tsu.trajectory_id, ""
-                )
+                response = self._subagent_responses.pop(tsu.trajectory_id, "")
                 result = types.ToolResult(
                     name=types.BuiltinTools.START_SUBAGENT.value,
                     result=response or tsu.trajectory_id,
                 )
-                await self._hook_runner.dispatch_post_tool_call(
-                    op_ctx, result
-                )
+                await self._hook_runner.dispatch_post_tool_call(op_ctx, result)
             else:
               # Parent trajectory went idle.
               self._parent_idle = True
@@ -965,6 +962,20 @@ class LocalConnection(connection.Connection):
               if not self._is_idle.is_set():
                 self._is_idle.set()
                 await self._step_queue.put(_IDLE_SENTINEL)
+
+            if tsu.HasField("error"):
+              if is_subagent:
+                # Subagent failures are only logged. If an issue is serious
+                # enough to be worth raising an exception then it should
+                # affect the main trajectory too.
+                logging.info(
+                    "Subagent trajectory failed with error: %s", tsu.error
+                )
+              else:
+                await self._step_queue.put(
+                    types.AntigravityExecutionError(tsu.error)
+                )
+
         elif event.HasField("tool_call"):
           self._run_in_background(self._handle_tool_call(event.tool_call))
     except websockets.ConnectionClosed as e:
@@ -1061,13 +1072,12 @@ class LocalConnection(connection.Connection):
       logging.exception("_handle_question_request failed; sending error")
       error_answer = localharness_pb2.UserQuestionAnswer(
           multiple_choice_answer=localharness_pb2.MultipleChoiceAnswer(
-              freeform_response=(
-                  f"SDK error processing question: {e!r}"
-              ),
+              freeform_response=f"SDK error processing question: {e!r}",
           ),
       )
       await self._send_question_response(
-          step_update, [error_answer],
+          step_update,
+          [error_answer],
       )
 
   async def _send_question_response(
@@ -1170,9 +1180,7 @@ class LocalConnection(connection.Connection):
       # ToolConfirmation only has a bool field (no error/reason field), so
       # rejecting is the only option. The harness transitions the step to
       # STATE_ERROR, which the model does see.
-      logging.exception(
-          "_handle_tool_confirmation_request failed; rejecting"
-      )
+      logging.exception("_handle_tool_confirmation_request failed; rejecting")
       await self._send_tool_confirmation(step_update, False)
 
   async def _send_tool_confirmation(
@@ -1388,12 +1396,10 @@ def _get_default_binary_path_external() -> str:
     if dist.files:
       for f in dist.files:
         normalized_path = str(f).replace("\\", "/")
-        if normalized_path.endswith(
-            (
-                "google/antigravity/bin/localharness",
-                "google/antigravity/bin/localharness.exe",
-            )
-        ):
+        if normalized_path.endswith((
+            "google/antigravity/bin/localharness",
+            "google/antigravity/bin/localharness.exe",
+        )):
           binary_path = os.path.abspath(str(f.locate()))
           if os.path.exists(binary_path):
             return binary_path
@@ -1750,7 +1756,7 @@ class LocalConnectionStrategy(connection.ConnectionStrategy):
               f"Failed to connect to WebSocket at {ws_url} after"
               f" {max_retries} attempts. Stderr: {stderr_output}"
           ) from e
-        await asyncio.sleep(0.1 * (2 ** attempt))
+        await asyncio.sleep(0.1 * (2**attempt))
 
     assert ws is not None
     try:

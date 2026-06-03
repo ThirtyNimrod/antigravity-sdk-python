@@ -137,6 +137,47 @@ class LocalConnectionTest(unittest.IsolatedAsyncioTestCase):
       async for _ in harness.conn.receive_steps():
         pass
 
+  async def test_receive_steps_trajectory_error(self):
+    harness = self._make_harness()
+
+    await harness.conn.send("Hello")
+    init_data = await harness.wait_for_response()
+    self.assertEqual(init_data.get("userInput"), "Hello")
+
+    # Set the cascade ID.
+    event1 = localharness_pb2.OutputEvent(
+        step_update=localharness_pb2.StepUpdate(
+            cascade_id="my_cascade",
+            trajectory_id="my_cascade",
+            step_index=1,
+            state=localharness_pb2.StepUpdate.STATE_ACTIVE,
+            source=localharness_pb2.StepUpdate.SOURCE_MODEL,
+            text="I'm working",
+        )
+    )
+    await harness.send_event(event1)
+
+    # Send an error.
+    event2 = localharness_pb2.OutputEvent(
+        trajectory_state_update=localharness_pb2.TrajectoryStateUpdate(
+            trajectory_id="my_cascade",
+            state=localharness_pb2.TrajectoryStateUpdate.STATE_IDLE,
+            error="Trajectory execution failed",
+        )
+    )
+    await harness.send_event(event2)
+    await harness.close_from_harness_side()
+
+    steps = []
+    with self.assertRaisesRegex(
+        types.AntigravityExecutionError, "Trajectory execution failed"
+    ):
+      async for step in harness.conn.receive_steps():
+        steps.append(step)
+
+    self.assertEqual(len(steps), 1)
+    self.assertEqual(steps[0].content, "I'm working")
+
   def test_local_connection_step_from_dict(self):
     """Tests that LocalConnectionStep maps fields correctly."""
     step_dict = {
